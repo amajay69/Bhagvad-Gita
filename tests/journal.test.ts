@@ -1,0 +1,65 @@
+// Gita Manan journal: entries are files on this computer, saved safely, never erased, and private to this machine.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createEntry, isEntryId, listEntries, trashEntry, updateEntry } from "../src/lib/server/journal.ts";
+import { isLocalRequest } from "../src/lib/server/guard.ts";
+
+const tmpDir = () => fs.mkdtemp(path.join(os.tmpdir(), "gita-manan-"));
+
+test("an entry is saved as a file and listed newest first", async () => {
+  const dir = await tmpDir();
+  const a = await createEntry("  Aaj office mein bahut pressure tha.  ", dir, new Date("2026-11-01T09:00:00Z"));
+  const b = await createEntry("Felt calmer today.", dir, new Date("2026-11-02T09:00:00Z"));
+  assert.equal(a.text, "Aaj office mein bahut pressure tha.");
+  assert.ok(isEntryId(a.id));
+  const onDisk = JSON.parse(await fs.readFile(path.join(dir, `${a.id}.json`), "utf8"));
+  assert.equal(onDisk.text, a.text);
+  assert.deepEqual((await listEntries(dir)).map((e) => e.id), [b.id, a.id]);
+  // no temporary files are left behind
+  assert.deepEqual((await fs.readdir(dir)).filter((n) => n.endsWith(".tmp")), []);
+});
+
+test("editing keeps the creation date and records the edit time", async () => {
+  const dir = await tmpDir();
+  const e = await createEntry("first wording", dir, new Date("2026-11-01T09:00:00Z"));
+  const next = await updateEntry(e.id, "second wording", dir, new Date("2026-11-03T09:00:00Z"));
+  assert.equal(next.createdAt, e.createdAt);
+  assert.equal(next.updatedAt, "2026-11-03T09:00:00.000Z");
+  assert.equal((await listEntries(dir))[0].text, "second wording");
+});
+
+test("deleting moves the entry to the trash folder instead of erasing it", async () => {
+  const dir = await tmpDir();
+  const e = await createEntry("to be removed", dir);
+  await trashEntry(e.id, dir);
+  assert.deepEqual(await listEntries(dir), []);
+  assert.ok(await fs.stat(path.join(dir, "trash", `${e.id}.json`)));
+});
+
+test("empty entries and ids that point outside the folder are refused", async () => {
+  const dir = await tmpDir();
+  await assert.rejects(createEntry("   ", dir), /empty/);
+  await assert.rejects(createEntry(42, dir), /text/);
+  await assert.rejects(updateEntry("../../secret", "x", dir), /Unknown entry/);
+  await assert.rejects(trashEntry("..\\..\\secret", dir), /Unknown entry/);
+});
+
+test("a missing folder means no entries yet, and unreadable files are skipped, not deleted", async () => {
+  const dir = await tmpDir();
+  assert.deepEqual(await listEntries(path.join(dir, "not-yet-created")), []);
+  const bad = path.join(dir, "20261101-090000-abcdef12.json");
+  await fs.writeFile(bad, "{ not json");
+  assert.deepEqual(await listEntries(dir), []);
+  assert.ok(await fs.stat(bad));
+});
+
+test("the journal is served only on this computer, never to other devices on the Wi-Fi", () => {
+  const req = (host: string, headers: Record<string, string> = {}) => new Request(`http://${host}/api/journal`, { headers: { host, ...headers } });
+  // journalGuard (src/lib/server/journalHttp.ts) refuses every request for which this is false
+  assert.equal(isLocalRequest(req("localhost:3000")), true);
+  assert.equal(isLocalRequest(req("192.168.29.209:3000")), false);
+  assert.equal(isLocalRequest(req("localhost:3000", { origin: "https://evil.example" })), false);
+});

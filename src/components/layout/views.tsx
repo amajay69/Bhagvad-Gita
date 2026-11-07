@@ -1,4 +1,4 @@
-import { BookOpen, NotebookPen, Orbit, Waypoints, type LucideIcon } from "lucide-react";
+import { BookOpen, NotebookPen, Orbit, PenLine, Waypoints, type LucideIcon } from "lucide-react";
 import type { ViewMode } from "@/lib/types";
 
 /**
@@ -15,6 +15,7 @@ export interface ViewInfo {
 }
 
 export const VIEWS: ViewInfo[] = [
+  { id: "journal", name: "Journal", sa: "Manan", icon: PenLine, blurb: "Write what is on your mind. Entries are saved as files on this computer." },
   { id: "cosmos", name: "Explore", sa: "Viśvarūpa", icon: Orbit, blurb: "See the whole Gita as one graph: chapters, verses, ideas, states of mind and life situations." },
   { id: "darshana", name: "Lineage", sa: "Darśana", icon: Waypoints, blurb: "Focus on one verse or idea and follow what leads to it and what follows from it." },
   { id: "adhyayana", name: "Read", sa: "Adhyayana", icon: BookOpen, blurb: "Read chapter by chapter with transliteration, translations, commentary and recitation." },

@@ -216,4 +216,4 @@ export interface ThoughtDraft {
 }
 
 /** "home" is the front page at `/`; the others are the four tools (`?view=`). */
-export type ViewMode = "home" | "cosmos" | "darshana" | "adhyayana" | "manas";
+export type ViewMode = "journal" | "home" | "cosmos" | "darshana" | "adhyayana" | "manas";

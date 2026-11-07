@@ -15,19 +15,21 @@ import { ChapterReader } from "@/components/reader/ChapterReader";
 import { askPartha } from "@/components/chat/GraphRagChatbot";
 import { PersonalMindMapper } from "@/components/manas/PersonalMindMapper";
 import Home from "@/components/home/Home";
+import Journal from "@/components/journal/Journal";
 import { ByokSettingsModal } from "@/components/settings/ByokSettingsModal";
 import { BrandMark } from "@/components/sacred/SacredMotifs";
 import { describeNode, findSutraPath } from "@/lib/graph/pathfinder";
 import { getReadingPosition } from "@/lib/store/readingPosition";
 import type { ViewMode } from "@/lib/types";
 
-const VIEW_IDS: ViewMode[] = ["home", "cosmos", "darshana", "adhyayana", "manas"];
+const VIEW_IDS: ViewMode[] = ["journal", "home", "cosmos", "darshana", "adhyayana", "manas"];
 const isView = (v: string | null): v is ViewMode => !!v && (VIEW_IDS as string[]).includes(v);
-/** `/` is the home page. Links from before it existed (`/?node=…`, `/?trace=…`, `/?ask=…`) still open Explore. */
+/** `/` opens the journal (Gita Manan's start page). Older links (`/?node=…`, `/?trace=…`, `/?ask=…`) still open Explore. */
+const START_VIEW: ViewMode = "journal";
 function viewFromQuery(qs: URLSearchParams): ViewMode {
   const v = qs.get("view");
   if (isView(v)) return v;
-  return qs.get("node") || qs.get("trace") || qs.get("ask") || qs.get("chat") === "1" ? "cosmos" : "home";
+  return qs.get("node") || qs.get("trace") || qs.get("ask") || qs.get("chat") === "1" ? "cosmos" : START_VIEW;
 }
 
 function ViewLoading({ label }: { label: string }) {
@@ -109,12 +111,13 @@ export default function App() {
     const node = qs.get("node");
     // First visit with no specific destination: the home page is the introduction. Arriving straight in a view
     // (a shared ?view= link) shows the short guide once instead.
+    const landing = startView === "home" || startView === START_VIEW;
     let welcomed = true;
     try {
       welcomed = !!localStorage.getItem("gitaviswa:welcomed");
-      if (!welcomed && startView === "home") localStorage.setItem("gitaviswa:welcomed", "1");
+      if (!welcomed && landing) localStorage.setItem("gitaviswa:welcomed", "1");
     } catch {}
-    if (!welcomed && startView !== "home" && !node && !ask && !qs.get("trace") && !qs.get("settings")) useGita.setState({ welcomeOpen: true });
+    if (!welcomed && !landing && !node && !ask && !qs.get("trace") && !qs.get("settings")) useGita.setState({ welcomeOpen: true });
     useGita
       .getState()
       .init()
@@ -186,7 +189,7 @@ export default function App() {
     const fromPop = popping.current;
     popping.current = false;
     const qs = new URLSearchParams();
-    if (view !== "home" || selectedId) qs.set("view", view);
+    if (view !== START_VIEW || selectedId) qs.set("view", view);
     if (selectedId) qs.set("node", selectedId);
     if (view === "adhyayana") qs.set("chapter", String(readerChapter));
     const next = `${window.location.pathname}${qs.size ? `?${qs}` : ""}`;
@@ -222,7 +225,9 @@ export default function App() {
             {/* The home page paints straight away; the tools wait for the data. */}
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={view} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
-                {view === "home" ? (
+                {view === "journal" ? (
+                  <Journal />
+                ) : view === "home" ? (
                   <Home />
                 ) : status === "error" ? (
                   <AppError error={error} />

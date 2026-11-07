@@ -164,7 +164,7 @@ export const useGita = create<GitaState>((set, get) => ({
   trash: [],
   graphVersion: 0,
 
-  view: "home",
+  view: "journal",
   themePref: "auto",
   theme: "dark",
   dockTab: "details",
