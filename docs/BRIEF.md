@@ -15,11 +15,12 @@ They are devotees or curious about the Gita, not scholars. They are not technica
 
 1. **Write**: today's journal entry. Type, speak, or upload a photo of a handwritten diary page.
 2. **Sit with the guide**: pick one entry, or "my last 7 days".
-3. **Response**, always in the same shape:
-   - one line that shows it understood
-   - a short story (Mahabharata characters, or an everyday office or family scene)
-   - one verse, in simple words
+3. **Response**, in layers:
+   - one line that shows it understood (a mirror, no advice)
+   - What the Gita says: relevant verses in simple words, only from verified verse data
+   - References: clickable verse, concept and emotion chips that open in the graph
    - one small action for tomorrow
+   - Optional button "Explain with a story": a story, fable or parable, labelled with its origin (Mahabharata, Panchatantra, Zen, folk tale). Tone inspired by today's teachers, but no guru is named as the source.
 
 ## 4. Voice of the guide
 
