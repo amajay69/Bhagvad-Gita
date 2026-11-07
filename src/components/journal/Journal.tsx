@@ -2,12 +2,14 @@
 // Gita Manan: the journal. Write what is on your mind; entries are saved as files on this computer.
 import { useCallback, useEffect, useState } from "react";
 import { Check, FolderOpen, Pencil, Trash2, TriangleAlert, X } from "lucide-react";
+import { GuidePanel, type GuideRecord } from "./Guide";
 
 interface Entry {
   id: string;
   createdAt: string;
   updatedAt: string;
   text: string;
+  guide?: GuideRecord;
 }
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
@@ -84,7 +86,10 @@ function EntryCard({ entry, onSaved, onDeleted }: { entry: Entry; onSaved: (e: E
           </div>
         </>
       ) : (
-        <p className="serif mt-2 whitespace-pre-wrap text-[16px] leading-[1.65] text-text">{entry.text}</p>
+        <>
+          <p className="serif mt-2 whitespace-pre-wrap text-[16px] leading-[1.65] text-text">{entry.text}</p>
+          <GuidePanel entryId={entry.id} text={entry.text} saved={entry.guide} onSaved={(guide) => onSaved({ ...entry, guide })} />
+        </>
       )}
       {error && <p className="mt-2 text-[13px] text-danger">{error}</p>}
     </li>

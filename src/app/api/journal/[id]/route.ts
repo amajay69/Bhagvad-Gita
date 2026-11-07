@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { trashEntry, updateEntry } from "@/lib/server/journal";
+import { saveGuide, trashEntry, updateEntry } from "@/lib/server/journal";
 import { journalFailure, journalGuard } from "@/lib/server/journalHttp";
 
 export const runtime = "nodejs";
@@ -12,8 +12,9 @@ export async function PUT(req: Request, ctx: Ctx) {
   if (blocked) return blocked;
   try {
     const { id } = await ctx.params;
-    const body = (await req.json().catch(() => ({}))) as { text?: unknown };
-    return NextResponse.json({ entry: await updateEntry(id, body.text) });
+    const body = (await req.json().catch(() => ({}))) as { text?: unknown; guide?: unknown };
+    // { guide } saves the guide's reply; { text } edits the entry
+    return NextResponse.json({ entry: body.guide !== undefined ? await saveGuide(id, body.guide) : await updateEntry(id, body.text) });
   } catch (e) {
     return journalFailure(e);
   }

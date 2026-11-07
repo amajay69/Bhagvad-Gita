@@ -7,11 +7,23 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
+/** The guide's latest reply to an entry, kept so it can be reread (and, later, remembered). */
+export interface GuideRecord {
+  at: string;
+  /** which provider and model answered */
+  via: string;
+  /** the reply as the model wrote it; laid out in layers by src/lib/guide/parse.ts */
+  text: string;
+  /** graph ids shown as references (verses, states, situations, concepts) */
+  refs: string[];
+}
+
 export interface JournalEntry {
   id: string;
   createdAt: string;
   updatedAt: string;
   text: string;
+  guide?: GuideRecord;
 }
 
 export const MAX_ENTRY_CHARS = 20000;
@@ -78,7 +90,10 @@ function parseEntry(raw: string): JournalEntry | null {
   try {
     const e = JSON.parse(raw) as Partial<JournalEntry>;
     if (typeof e.id !== "string" || !isEntryId(e.id) || typeof e.text !== "string" || typeof e.createdAt !== "string") return null;
-    return { id: e.id, text: e.text, createdAt: e.createdAt, updatedAt: typeof e.updatedAt === "string" ? e.updatedAt : e.createdAt };
+    const entry: JournalEntry = { id: e.id, text: e.text, createdAt: e.createdAt, updatedAt: typeof e.updatedAt === "string" ? e.updatedAt : e.createdAt };
+    const g = e.guide;
+    if (g && typeof g.text === "string" && typeof g.at === "string") entry.guide = { at: g.at, via: typeof g.via === "string" ? g.via : "", text: g.text, refs: Array.isArray(g.refs) ? g.refs.filter((r) => typeof r === "string") : [] };
+    return entry;
   } catch {
     return null;
   }
@@ -139,4 +154,17 @@ export async function trashEntry(id: string, dir = journalDir()): Promise<void> 
   const trash = path.join(dir, "trash");
   await fs.mkdir(trash, { recursive: true });
   await fs.rename(fileFor(dir, id), fileFor(trash, id));
+}
+
+const REF_RE = /^[A-Za-z]+[_:][\w.\-]{1,60}$/;
+
+/** Saves the guide's reply on the entry (replacing an earlier one). Editing the entry text keeps it. */
+export async function saveGuide(id: string, guide: unknown, dir = journalDir(), now = new Date()): Promise<JournalEntry> {
+  const g = (guide && typeof guide === "object" ? guide : {}) as Partial<GuideRecord>;
+  if (typeof g.text !== "string" || !g.text.trim() || g.text.length > 8000) throw new JournalError("The guide's reply is missing or too long.", 400);
+  const refs = Array.isArray(g.refs) ? g.refs.filter((r): r is string => typeof r === "string" && REF_RE.test(r)).slice(0, 24) : [];
+  const entry = await readEntry(dir, id);
+  const next: JournalEntry = { ...entry, guide: { at: now.toISOString(), via: typeof g.via === "string" ? g.via.slice(0, 200) : "", text: g.text.trim(), refs } };
+  await writeAtomic(fileFor(dir, id), JSON.stringify(next, null, 2));
+  return next;
 }
