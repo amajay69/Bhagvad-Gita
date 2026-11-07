@@ -55,3 +55,17 @@ test("crisis language in Hinglish is recognised, not only English and Devanagari
   assert.equal(detectCrisis("khud ko khatam kar dunga"), true);
   assert.equal(detectCrisis("Deadline ne aaj maar diya, bahut thak gaya"), false);
 });
+
+test("Hinglish and Indian English feelings are recognised for search", async () => {
+  const { hinglishStates, expandForSearch } = await import("../src/lib/guide/hinglish.ts");
+  assert.deepEqual(hinglishStates("Mujhe bahut gussa aaya aaj boss pe. Tension ho rahi hai."), ["emotion:krodha", "emotion:chinta"]);
+  assert.deepEqual(hinglishStates("feeling too good today"), ["emotion:sukha"]);
+  assert.match(expandForSearch("feeling too good"), /happy joy/);
+  // a word inside another word does not count ("darshan" is not "dar")
+  assert.deepEqual(hinglishStates("went for darshan"), []);
+});
+
+test("a feeling stated in Hinglish counts as the writer's own", async () => {
+  const { classifyMention } = await import("../src/lib/graphrag/mentions.ts");
+  assert.equal(classifyMention("mujhe bahut gussa aaya aaj", "gussa"), "expressed");
+});

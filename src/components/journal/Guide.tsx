@@ -10,6 +10,8 @@ import { streamFromApi } from "@/lib/llm/browser";
 import { retrieve, type RagContext } from "@/lib/graphrag/engine";
 import { CRISIS_RESOURCES, detectCrisis } from "@/lib/graphrag/safety";
 import { parseGuide } from "@/lib/guide/parse";
+import { guideContext, guideThemes } from "@/lib/guide/context";
+import { expandForSearch } from "@/lib/guide/hinglish";
 import { embedQuery } from "@/lib/graphrag/search";
 
 export interface GuideRecord {
@@ -98,9 +100,10 @@ export function GuidePanel({ entryId, text, saved, onSaved }: { entryId: string;
     setOffline(null);
     try {
       // Meaning-based search (a small model in the browser) alongside keywords, as Ask does; keywords alone if unavailable.
-      const vector = useSettings.getState().semantic && c.index?.hasVectors ? await embedQuery(text).catch(() => null) : null;
-      const r = await retrieve(c, text, { vector, limitVerses: 8 });
-      const themes = [...r.emotions.slice(0, 2), ...r.dilemmas.slice(0, 1), ...r.concepts.slice(0, 2)].map((x) => x.id);
+      const query = expandForSearch(text);
+      const vector = useSettings.getState().semantic && c.index?.hasVectors ? await embedQuery(query).catch(() => null) : null;
+      const r = await retrieve(c, query, { vector, limitVerses: 8 });
+      const themes = guideThemes(c, r, text);
       const toOffline = (note: string) =>
         setOffline({
           verses: r.verses.slice(0, 3).map((v) => v.id),
@@ -109,7 +112,7 @@ export function GuidePanel({ entryId, text, saved, onSaved }: { entryId: string;
         });
       const connection = currentConnection(useSettings.getState());
       if (!connection) return toOffline("These verses were found from the Gita's own connections. Connect an AI model in Settings (gear icon) to get the guide's reflection and a step for tomorrow.");
-      const res = await streamFromApi({ mode: "guide", question: text, context: r.context });
+      const res = await streamFromApi({ mode: "guide", question: text, context: guideContext(c, r, themes) });
       if (!res.ok || !res.text.trim()) return toOffline(`The AI could not be reached (${res.error || "empty reply"}). These verses were found from the Gita's own connections instead.`);
       const parsed = parseGuide(res.text, (id) => c.versesById.has(id));
       const record = { via: `${res.provider || PROVIDERS[connection.provider].name}, ${res.model || connection.model}`, text: res.text.trim(), refs: [...parsed.verses.map((v) => v.id), ...themes] };
