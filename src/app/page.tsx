@@ -131,7 +131,13 @@ export default function App() {
           g.setHighlight({ nodes: new Set(p.nodes), edges: new Set(p.steps.map((x) => x.edgeKey)), label: `Path from ${describeNode(g.graphs.nodeById.get(a))} to ${describeNode(g.graphs.nodeById.get(b))}`, source: "path", order: p.nodes });
       });
     useSettings.getState().loadEnv();
-    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") navigator.serviceWorker.register("/sw.js").catch(() => {});
+    // No offline copy: remove the service worker and saved pages an earlier version installed (see public/sw.js).
+    if ("serviceWorker" in navigator)
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => regs.forEach((r) => r.unregister()))
+        .catch(() => {});
+    if ("caches" in window) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
   }, []);
 
   // One theme for the whole product: pinned, or following the system live.
