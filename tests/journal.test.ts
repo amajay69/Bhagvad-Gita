@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createEntry, documentsDir, isEntryId, journalDir, listEntries, saveGuide, trashEntry, updateEntry } from "../src/lib/server/journal.ts";
+import { createEntry, documentsDir, isEntryId, journalDir, listEntries, saveGuide, saveStory, trashEntry, updateEntry } from "../src/lib/server/journal.ts";
 import { isLocalRequest } from "../src/lib/server/guard.ts";
 
 const tmpDir = () => fs.mkdtemp(path.join(os.tmpdir(), "gita-manan-"));
@@ -82,4 +82,15 @@ test("the guide's reply is saved with the entry and survives an edit of the entr
   assert.equal(saved.guide?.via, "Groq, model");
   assert.deepEqual(saved.guide?.refs, ["BG_3.35", "emotion:krodha"]);
   await assert.rejects(saveGuide(e.id, { text: "" }, dir), /missing/);
+});
+
+test("a story is saved on the guide's reply, and a new reply starts without one", async () => {
+  const dir = await tmpDir();
+  const e = await createEntry("gussa", dir);
+  await assert.rejects(saveStory(e.id, { text: "TITLE: x" }, dir), /Sit with the guide first/);
+  await saveGuide(e.id, { via: "m", text: "MIRROR: x", refs: [] }, dir);
+  await saveStory(e.id, { via: "m", text: "TITLE: t\nSOURCE: Panchatantra\nSTORY: s" }, dir);
+  assert.match((await listEntries(dir))[0].guide?.story?.text ?? "", /Panchatantra/);
+  await saveGuide(e.id, { via: "m", text: "MIRROR: y", refs: [] }, dir);
+  assert.equal((await listEntries(dir))[0].guide?.story, undefined);
 });

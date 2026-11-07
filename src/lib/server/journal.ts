@@ -16,6 +16,15 @@ export interface GuideRecord {
   text: string;
   /** graph ids shown as references (verses, states, situations, concepts) */
   refs: string[];
+  /** the optional story told for this reply; asking the guide again starts without one */
+  story?: StoryRecord;
+}
+
+export interface StoryRecord {
+  at: string;
+  via: string;
+  /** the story as the model wrote it; laid out by src/lib/guide/story.ts */
+  text: string;
 }
 
 export interface JournalEntry {
@@ -92,7 +101,11 @@ function parseEntry(raw: string): JournalEntry | null {
     if (typeof e.id !== "string" || !isEntryId(e.id) || typeof e.text !== "string" || typeof e.createdAt !== "string") return null;
     const entry: JournalEntry = { id: e.id, text: e.text, createdAt: e.createdAt, updatedAt: typeof e.updatedAt === "string" ? e.updatedAt : e.createdAt };
     const g = e.guide;
-    if (g && typeof g.text === "string" && typeof g.at === "string") entry.guide = { at: g.at, via: typeof g.via === "string" ? g.via : "", text: g.text, refs: Array.isArray(g.refs) ? g.refs.filter((r) => typeof r === "string") : [] };
+    if (g && typeof g.text === "string" && typeof g.at === "string") {
+      entry.guide = { at: g.at, via: typeof g.via === "string" ? g.via : "", text: g.text, refs: Array.isArray(g.refs) ? g.refs.filter((r) => typeof r === "string") : [] };
+      const s = g.story;
+      if (s && typeof s.text === "string" && typeof s.at === "string") entry.guide.story = { at: s.at, via: typeof s.via === "string" ? s.via : "", text: s.text };
+    }
     return entry;
   } catch {
     return null;
@@ -165,6 +178,17 @@ export async function saveGuide(id: string, guide: unknown, dir = journalDir(), 
   const refs = Array.isArray(g.refs) ? g.refs.filter((r): r is string => typeof r === "string" && REF_RE.test(r)).slice(0, 24) : [];
   const entry = await readEntry(dir, id);
   const next: JournalEntry = { ...entry, guide: { at: now.toISOString(), via: typeof g.via === "string" ? g.via.slice(0, 200) : "", text: g.text.trim(), refs } };
+  await writeAtomic(fileFor(dir, id), JSON.stringify(next, null, 2));
+  return next;
+}
+
+/** Saves a story on the entry's current guide reply (replacing an earlier story). */
+export async function saveStory(id: string, story: unknown, dir = journalDir(), now = new Date()): Promise<JournalEntry> {
+  const st = (story && typeof story === "object" ? story : {}) as Partial<StoryRecord>;
+  if (typeof st.text !== "string" || !st.text.trim() || st.text.length > 8000) throw new JournalError("The story is missing or too long.", 400);
+  const entry = await readEntry(dir, id);
+  if (!entry.guide) throw new JournalError("Sit with the guide first; the story belongs to its reply.", 400);
+  const next: JournalEntry = { ...entry, guide: { ...entry.guide, story: { at: now.toISOString(), via: typeof st.via === "string" ? st.via.slice(0, 200) : "", text: st.text.trim() } } };
   await writeAtomic(fileFor(dir, id), JSON.stringify(next, null, 2));
   return next;
 }

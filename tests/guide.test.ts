@@ -69,3 +69,17 @@ test("a feeling stated in Hinglish counts as the writer's own", async () => {
   const { classifyMention } = await import("../src/lib/graphrag/mentions.ts");
   assert.equal(classifyMention("mujhe bahut gussa aaya aaj", "gussa"), "expressed");
 });
+
+test("a story reply keeps its source, and a reply without one is flagged", async () => {
+  const { parseStory } = await import("../src/lib/guide/story.ts");
+  const s = parseStory(`**TITLE:** The Monk and the Scorpion
+**SOURCE:** A popular Indian parable
+**STORY:** A monk saw a scorpion drowning.
+
+He lifted it out, and it stung him.
+**LINK:** Your nature need not change because of another's.`);
+  assert.equal(s.ok, true);
+  assert.equal(s.source, "A popular Indian parable");
+  assert.match(s.story, /drowning\.\n\nHe lifted/);
+  assert.equal(parseStory("Once upon a time, a story with no source.").ok, false);
+});

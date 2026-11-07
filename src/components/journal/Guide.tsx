@@ -2,7 +2,7 @@
 // "Sit with the guide": what the Gita says about one journal entry, in layers.
 // Verse wording always comes from the verified verse data; the model only explains how a verse speaks to the entry.
 import { useState } from "react";
-import { HeartHandshake, RotateCw, Sparkles } from "lucide-react";
+import { BookOpenText, HeartHandshake, RotateCw, Sparkles } from "lucide-react";
 import { useGita } from "@/lib/store/useGitaStore";
 import { currentConnection, useConnection, useSettings } from "@/lib/store/settingsStore";
 import { PROVIDERS } from "@/lib/llm/providers";
@@ -13,12 +13,89 @@ import { parseGuide } from "@/lib/guide/parse";
 import { guideContext, guideThemes } from "@/lib/guide/context";
 import { expandForSearch } from "@/lib/guide/hinglish";
 import { embedQuery } from "@/lib/graphrag/search";
+import { parseStory } from "@/lib/guide/story";
+import type { GuideReply } from "@/lib/guide/parse";
+
+export interface StoryRecord {
+  at: string;
+  via: string;
+  text: string;
+}
 
 export interface GuideRecord {
   at: string;
   via: string;
   text: string;
   refs: string[];
+  story?: StoryRecord;
+}
+
+/** "Explain with a story": optional, told for the guide's current reply and saved with it. */
+function StoryPart({ ctx, entryId, text, reply, story, onSaved }: { ctx: RagContext; entryId: string; text: string; reply: GuideReply; story?: StoryRecord; onSaved: (s: StoryRecord) => void }) {
+  const conn = useConnection();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const tell = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const def = String(ctx.versesDoc.meta.defaults.en);
+      const verses = reply.verses.map((v) => `[BG ${v.ref}] Meaning: ${(ctx.versesById.get(v.id)?.translations.en?.[def] || "").replace(/\s+/g, " ").trim()}\nGuide's note: ${v.note}`);
+      const context = `# The guide's reflection\n${reply.mirror}\n\n# The verses the guide chose\n${verses.join("\n\n")}\n\n# The step the guide suggested\n${reply.action}`;
+      const res = await streamFromApi({ mode: "story", question: text, context });
+      if (!res.ok || !res.text.trim()) throw new Error(`The AI could not be reached (${res.error || "empty reply"}).`);
+      const record = { via: `${res.provider}, ${res.model}`, text: res.text.trim() };
+      const put = await fetch(`/api/journal/${entryId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ story: record }) });
+      const data = (await put.json().catch(() => ({}))) as { entry?: { guide?: GuideRecord }; error?: string };
+      if (put.ok && data.entry?.guide?.story) onSaved(data.entry.guide.story);
+      else {
+        onSaved({ ...record, at: new Date().toISOString() });
+        setError(`Shown, but not saved: ${data.error || `HTTP ${put.status}`}`);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const s = story ? parseStory(story.text) : null;
+  return (
+    <div>
+      {s && (
+        <div className="rounded-[var(--radius-2)] border border-line p-3">
+          {s.ok ? (
+            <>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <div className="text-[15px] font-semibold text-text">{s.title || "A story"}</div>
+                <div className="text-[12px] text-text-3">Source: {s.source}</div>
+              </div>
+              <div className="serif mt-2 space-y-2 text-[15px] leading-[1.65] text-text">
+                {s.story
+                  .split(/\n\s*\n|\n/)
+                  .filter((x) => x.trim())
+                  .map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+              </div>
+              {s.link && <p className="mt-3 text-[14px] leading-[1.6] text-text-2">{s.link}</p>}
+            </>
+          ) : (
+            <p className="whitespace-pre-wrap text-[14px] leading-[1.6] text-text">{story!.text}</p>
+          )}
+          <p className="mt-3 text-[11.5px] leading-4 text-text-3">Retold by AI ({story!.via}). The source is as the AI states it; if it matters to you, please check it.</p>
+        </div>
+      )}
+      {conn && (
+        <button className="btn btn-sm mt-2" onClick={tell} disabled={busy}>
+          <BookOpenText size={14} /> {busy ? "Finding a story…" : s ? "Another story" : "Explain with a story"}
+        </button>
+      )}
+      {error && <p className="mt-2 text-[13px] text-danger">{error}</p>}
+    </div>
+  );
 }
 
 interface Offline {
@@ -169,6 +246,7 @@ export function GuidePanel({ entryId, text, saved, onSaved }: { entryId: string;
                   <p className="mt-1 text-[14px] leading-[1.6] text-text">{parsed.action}</p>
                 </div>
               )}
+              <StoryPart ctx={ctx} entryId={entryId} text={text} reply={parsed} story={saved.story} onSaved={(story) => onSaved({ ...saved, story })} />
             </>
           )}
 

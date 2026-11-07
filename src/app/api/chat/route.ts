@@ -3,6 +3,7 @@ import { isProviderId, PROVIDERS } from "@/lib/llm/providers";
 import { openStream, ProviderError, resolveProvider, type ChatMessage } from "@/lib/llm/client";
 import { ANALYZE_SYSTEM, BRIDGE_SYSTEM, COMMENTARY_SYSTEM, PARTHA_SARATHI_SYSTEM, TRANSLATE_SYSTEM, buildUserTurn } from "@/lib/graphrag/prompts";
 import { GUIDE_SYSTEM, guideUserTurn } from "@/lib/guide/prompt";
+import { STORY_SYSTEM } from "@/lib/guide/story";
 import { getServerRag } from "@/lib/server/data";
 import { retrieve } from "@/lib/graphrag/engine";
 import { isLocalRequest, serverKeysAllowed } from "@/lib/server/guard";
@@ -11,8 +12,8 @@ import { embedQueryServer } from "@/lib/server/embedder";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Mode = "chat" | "bridge" | "translate" | "analyze" | "commentary" | "guide";
-const SYSTEM: Record<Mode, string> = { guide: GUIDE_SYSTEM, chat: PARTHA_SARATHI_SYSTEM, bridge: BRIDGE_SYSTEM, translate: TRANSLATE_SYSTEM, analyze: ANALYZE_SYSTEM, commentary: COMMENTARY_SYSTEM };
+type Mode = "chat" | "bridge" | "translate" | "analyze" | "commentary" | "guide" | "story";
+const SYSTEM: Record<Mode, string> = { guide: GUIDE_SYSTEM, story: STORY_SYSTEM, chat: PARTHA_SARATHI_SYSTEM, bridge: BRIDGE_SYSTEM, translate: TRANSLATE_SYSTEM, analyze: ANALYZE_SYSTEM, commentary: COMMENTARY_SYSTEM };
 
 interface Body {
   mode?: Mode;
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   }
   const mode: Mode = body.mode && body.mode in SYSTEM ? body.mode : "chat";
   // A journal entry (guide) may be longer than a question.
-  const question = (body.question || "").toString().slice(0, mode === "guide" ? 8000 : 4000).trim();
+  const question = (body.question || "").toString().slice(0, mode === "guide" || mode === "story" ? 8000 : 4000).trim();
   if (!question) return NextResponse.json({ error: "Missing question", code: "bad-request" }, { status: 400 });
 
   const providerId = body.provider || process.env.LLM_PROVIDER || "";
@@ -75,13 +76,13 @@ export async function POST(req: Request) {
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .slice(-6)
     .map((m) => ({ role: m.role, content: m.content.slice(0, 3000) }));
-  const messages: ChatMessage[] = [{ role: "system", content: SYSTEM[mode] }, ...history, { role: "user", content: mode === "guide" ? guideUserTurn(question, context) : context ? buildUserTurn(question, context) : question }];
+  const messages: ChatMessage[] = [{ role: "system", content: SYSTEM[mode] }, ...history, { role: "user", content: mode === "guide" || mode === "story" ? guideUserTurn(question, context) : context ? buildUserTurn(question, context) : question }];
 
   // Pull the first chunk before committing to a 200 so upstream auth/model errors surface as JSON.
   // openStream also swaps in an available model if the configured one has been retired by the provider.
   let opened: Awaited<ReturnType<typeof openStream>>;
   try {
-    opened = await openStream(provider, messages, { temperature: mode === "analyze" || mode === "translate" || mode === "commentary" ? 0.2 : mode === "guide" ? 0.4 : 0.55, signal: req.signal });
+    opened = await openStream(provider, messages, { temperature: mode === "analyze" || mode === "translate" || mode === "commentary" ? 0.2 : mode === "guide" ? 0.4 : mode === "story" ? 0.7 : 0.55, signal: req.signal });
   } catch (e) {
     const err = e as ProviderError;
     return NextResponse.json({ error: err.message, code: err.code || "upstream" }, { status: err.status && err.status < 600 ? err.status : 502 });
