@@ -1,6 +1,7 @@
 // Gita Manan journal: one JSON file per entry, in a folder on the user's own computer.
-// The folder lives outside the app (default: Documents/Gita Manan/journal) so updating or reinstalling the app
+// The folder lives outside the app (default: Documents/Gita Manan/journal, OneDrive's Documents when present) so updating or reinstalling the app
 // never touches the diary. Deleted entries move to a "trash" subfolder instead of being erased.
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,9 +20,22 @@ export const MAX_ENTRY_CHARS = 20000;
 const ID_RE = /^\d{8}-\d{6}-[a-f0-9]{8}$/;
 export const isEntryId = (id: string) => ID_RE.test(id);
 
-export function journalDir(): string {
-  const custom = process.env.GITA_MANAN_DIR?.trim();
-  return custom ? path.resolve(custom) : path.join(os.homedir(), "Documents", "Gita Manan", "journal");
+/**
+ * The "Documents" folder File Explorer shows. On many Windows laptops OneDrive takes it over, so it is
+ * %OneDrive%\Documents rather than %USERPROFILE%\Documents; the OneDrive one is used whenever it exists,
+ * which also gives the diary OneDrive's backup.
+ */
+export function documentsDir(env: NodeJS.ProcessEnv = process.env, home = os.homedir()): string {
+  for (const root of [env.OneDrive, env.OneDriveConsumer, env.OneDriveCommercial]) {
+    const docs = root?.trim() ? path.join(root.trim(), "Documents") : "";
+    if (docs && existsSync(docs)) return docs;
+  }
+  return path.join(home, "Documents");
+}
+
+export function journalDir(env: NodeJS.ProcessEnv = process.env): string {
+  const custom = env.GITA_MANAN_DIR?.trim();
+  return custom ? path.resolve(custom) : path.join(documentsDir(env), "Gita Manan", "journal");
 }
 
 const fileFor = (dir: string, id: string) => path.join(dir, `${id}.json`);

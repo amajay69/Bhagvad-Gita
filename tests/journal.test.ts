@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createEntry, isEntryId, listEntries, trashEntry, updateEntry } from "../src/lib/server/journal.ts";
+import { createEntry, documentsDir, isEntryId, journalDir, listEntries, trashEntry, updateEntry } from "../src/lib/server/journal.ts";
 import { isLocalRequest } from "../src/lib/server/guard.ts";
 
 const tmpDir = () => fs.mkdtemp(path.join(os.tmpdir(), "gita-manan-"));
@@ -62,4 +62,13 @@ test("the journal is served only on this computer, never to other devices on the
   assert.equal(isLocalRequest(req("localhost:3000")), true);
   assert.equal(isLocalRequest(req("192.168.29.209:3000")), false);
   assert.equal(isLocalRequest(req("localhost:3000", { origin: "https://evil.example" })), false);
+});
+
+test("the diary goes to OneDrive's Documents when OneDrive has taken over Documents", async () => {
+  const home = await tmpDir();
+  const oneDrive = path.join(home, "OneDrive");
+  assert.equal(documentsDir({ OneDrive: oneDrive }, home), path.join(home, "Documents"));
+  await fs.mkdir(path.join(oneDrive, "Documents"), { recursive: true });
+  assert.equal(documentsDir({ OneDrive: oneDrive }, home), path.join(oneDrive, "Documents"));
+  assert.equal(journalDir({ GITA_MANAN_DIR: path.join(home, "mine") }), path.join(home, "mine"));
 });
