@@ -1,6 +1,6 @@
 # Product Brief (v0.1)
 
-Working name: to be decided. Built on GitaViśva by Himanshu Mohanty (MIT licence; his copyright notice stays).
+Name: Gita Manan. Tagline: "Insights from the Gita". Built on GitaViśva by Himanshu Mohanty (MIT licence; his copyright notice stays).
 
 ## 1. Who it is for
 
@@ -26,7 +26,7 @@ They are devotees or curious about the Gita, not scholars. They are not technica
 - A sarathi (guide) who narrates what Krishna teaches. The AI never speaks as Krishna.
 - English as the main language, with Hindi or Hinglish lines for impact.
 - Simple words, short answers. No Sanskrit jargon unless explained.
-- Stories are labelled: what comes from the Gita or Mahabharata, and what is an illustration.
+- Stories can come from any source (Mahabharata, Ramayana, Puranas, saints' lives, everyday life). Every story is labelled with its source. The AI never makes up a story and attributes it to a scripture or saint.
 
 ## 5. Memory: a lifelong companion
 
@@ -63,10 +63,8 @@ Tele-MANAS 14416 (free, 24x7, government of India). Verses come after, never ins
 
 ## 10. Out of scope for v1
 
-Login, cloud sync, mobile app, payments, multiple users on one machine.
+Login, cloud sync, mobile app, payments, multiple users on one machine, daily reminders.
 
 ## 11. Open questions
 
-- Product name.
-- Which stories are allowed: only Mahabharata and Gita, or also Ramayana, Puranas, saints' lives?
-- Daily reminder to journal: yes or no?
+None at the moment.
